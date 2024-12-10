@@ -1,0 +1,273 @@
+/* General Styling */
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f4f9;
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+/* Header Styling */
+.header {
+    background-color: #4682B4;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    position: relative;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    margin: 0;
+    color: Darkblue;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.header .fas.fa-chart-bar {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 25px;
+    color: Darkblue;
+}
+
+/* Header Icon Styling */
+.header .chart-icon {
+    position: absolute;
+    right: 20px;  /* Position the icon to the right */
+    top: 50%;  /* Vertically center the icon */
+    transform: translateY(-50%);  /* Fine-tuning vertical alignment */
+    font-size: 24px;  /* Adjust icon size */
+    color: rgb(228, 228, 228);  /* Set the icon color to white */
+}
+
+
+/* Containers */
+html.Div {
+    border-radius: 10px;
+    background-color: #ffffff;
+    padding: 15px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+html.Div:hover {
+    box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Tabs Styling */
+.dccTabs {
+    margin-bottom: 20px;
+}
+
+.dccTabs .tab {
+    border: none;
+    padding: 10px;
+    border-radius: 10px 10px 0 0;
+    font-size: 16px;
+    font-weight: bold;
+    background-color: #f4f4f9;
+    color: #4682B4;
+    transition: all 0.3s ease;
+}
+
+.dccTabs .tab--selected {
+    background-color: #f4f4f9;
+    color: #4682B4;
+    border-bottom: 3px solid #4682B4;
+    font-weight: bold; /* Make the active tab bold */
+}
+
+/* Dropdown Styling */
+.dccDropdown {
+    width: 250px;
+    margin: 0;
+    border-radius: 10px;
+}
+
+.dccDropdown .Select__control {
+    border: 1px solid #cccccc;
+    border-radius: 10px;
+    box-shadow: none;
+    transition: border 0.3s ease;
+}
+
+.dccDropdown .Select__control:hover {
+    border-color: #4682B4;
+}
+
+.dccDropdown .Select__menu {
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Buttons Styling */
+html.Button {
+    background-color: #4682B4;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+
+html.Button:hover {
+    background-color: #365f8a;
+}
+
+/* Reset Button */
+#reset-chart-button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: #4682B4;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+#reset-chart-button:hover {
+    background-color: #365f8a;
+}
+
+/* Toggle Button */
+.dccChecklist {
+    margin-left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.dccChecklist label {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
+
+.dccChecklist input[type="checkbox"] {
+    appearance: none;
+    width: 40px;
+    height: 20px;
+    background-color: #cccccc;
+    border-radius: 10px;
+    position: relative;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dccChecklist input[type="checkbox"]:checked {
+    background-color: #4682B4;
+}
+
+.dccChecklist input[type="checkbox"]:checked::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+.dccChecklist input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+/* Table Styling */
+.dash-table-container {
+    margin-top: 20px;
+}
+
+.dash-table-container .dash-table {
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.dash-table-container th, 
+.dash-table-container td {
+    padding: 15px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.dash-table-container th {
+    background-color: #4682B4;
+    color: rgb(15, 15, 15);
+    font-weight: bold;
+}
+
+.dash-table-container td {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.dash-table-container tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.dash-table-container tr:hover {
+    background-color: #ddd;
+}
+
+/* Footer Buttons */
+#exclude-button, #reset-button {
+    background-color: #4682B4;
+    border: none;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+
+#exclude-button:hover, #reset-button:hover {
+    background-color: #365f8a;
+}
+
+/* Download Button */
+#download-button {
+    background-color: #4682B4;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+#download-button:hover {
+    background-color: #365f8a;
+}
+
+#download-button i {
+    margin-right: 8px;
+    font-size: 18px; /* Adjust the icon size */
+}
+
+#download-button span {
+    font-size: 14px;
+}
