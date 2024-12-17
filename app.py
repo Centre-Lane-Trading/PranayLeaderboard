@@ -1,3 +1,4 @@
+from ast import Global
 import dash
 from dash import dcc, html, Input, Output, State, dash_table
 import dash_bootstrap_components as dbc
@@ -9,6 +10,7 @@ import base64
 import pandas as pd
 from logic import Leaderboard
 import logic
+from dash.exceptions import PreventUpdate
 from datetime import date
 
 
@@ -23,6 +25,13 @@ def create_figure(data, x_col, y_col, title, x_label, y_label, group_col="policy
     Create a Plotly Figure from given data, with cumulative profit.
     """
     fig = go.Figure()
+    
+    # Define your policy colors
+    policy_colors = {
+        "PJMvirts Captain Hindsight": "#54C158",  # Green
+        "PJMvirts Pricetaker Short": "#FFA800",   # Orange
+        "PJMvirts Pricetaker Long": "#25A5FF"     # Blue
+    }
 
     if data is not None and not data.is_empty():
         for group in data[group_col].unique():
@@ -35,19 +44,22 @@ def create_figure(data, x_col, y_col, title, x_label, y_label, group_col="policy
             filtered_data = filtered_data.with_columns(
                 pl.col(y_col).cum_sum().alias("cumulative_profit")
             )
-
-            # Add trace for each policy
+            
+            # Get the color for the current group, default to gray if not found
+            line_color = policy_colors.get(group, "#A0A0A0")  # Default color if not found
+            
+            # Add trace for each policy with specific color
             fig.add_trace(go.Scatter(
                 x=filtered_data[x_col].to_list(),
                 y=filtered_data["cumulative_profit"].to_list(),
                 mode="lines",
-                name=group
+                name=group,
+                line=dict(color=line_color)  # Set the line color
             ))
 
+    # Update layout with titles and such
     fig.update_layout(title=title, xaxis_title=x_label, yaxis_title=y_label)
     return fig
-
-
 
 
 def prepare_table_data(data):
@@ -66,7 +78,6 @@ policy_colors = {
     "Pricetaker Short": "#FFA800",   # Orange
     "Pricetaker Long": "#25A5FF"     # Blue
 }
-
 
 app.layout = html.Div([
     # Header
@@ -106,36 +117,47 @@ app.layout = html.Div([
                                     {"label": "Short", "value": "profit_short"},
                                     {"label": "Long", "value": "profit_long"}
                                 ],
-                                placeholder="Select data type",
+                                value="profit_total",
+                                clearable=False,
                                 style={"width": "200px"}
                             ),
-
-                            dbc.Checklist(
-                                options=[{"label": "Enable Area", "value": "enable"}],
-                                value=[],  # Initially unchecked
-                                id="area-toggle",
-                                switch=True,
-                                style={"marginLeft": "10px"}
-                            ),
-                            html.Button(
-                                "Reset Chart",
-                                id="reset-chart-button",
-                                style={
-                                    "marginLeft": "10px",
-                                    "backgroundColor": "#4682B4",
-                                    "border": "none",
-                                    "color": "white",
-                                    "padding": "10px",
-                                    "borderRadius": "5px",
-                                    "cursor": "pointer"
-                                }
-                            )
+                            html.Div([
+                                dbc.Checklist(
+                                    options=[{"label": "Enable Area", "value": "enable"}],
+                                    value=[],  # Initially unchecked
+                                    id="area-toggle",
+                                    switch=True,
+                                    style={"marginLeft": "10px"},
+                                    inline=True,
+                                ),
+                                html.Button(
+                                    "Reset Chart",
+                                    id="reset-chart-toggle-button",
+                                    style={
+                                        "marginLeft": "10px",
+                                        "backgroundColor": "#4682B4",
+                                        "border": "none",
+                                        "color": "white",
+                                        "padding": "10px",
+                                        "borderRadius": "5px",
+                                        "cursor": "pointer"
+                                    },
+                                    n_clicks=0,
+                                )
+                            ], id='toggle-area-container', style={"display":"none"}),
                         ]
                     ),
                     # Chart container and the content for selected tab
                     html.Div(
                         id="chart-container",
-                        style={"marginBottom": "20px"}
+                        style={"marginBottom": "20px"},
+                        children=[
+                            dcc.Graph(
+                                id="graph",  # This is the id referenced in the callback
+                                config={"scrollZoom": True},  # Allow zooming
+                                style={"height": "500px"},  # Set graph size
+                            )
+                        ],
                     ),
                     # Footer (Date range filter)
                     html.Div(
@@ -178,17 +200,19 @@ app.layout = html.Div([
                         style={"display": "flex", "alignItems": "center", "marginBottom": "20px"},
                         children=[
                             dcc.Dropdown(
-                                id="model-dropdown",
+                                id="download-dropdown",
                                 options=[
-                                    {"label": "PJMvirts Captain Hindsight", "value": "Captain Hindsight"},
-                                    {"label": "PJMvirts Pricetaker Short", "value": "Pricetaker Short"},
-                                    {"label": "PJMvirts Pricetaker Long", "value": "Pricetaker Long"}
+                                    {"label": "Displayed Data", "value": "window_data"},
+                                    {"label": "Exclusions Data", "value": "exclsion_data"},
+                                    {"label": "Original Data", "value": "original_data"}
                                 ],
+                                value="Displayed Data",
                                 placeholder="Select a model",
                                 style={"flex": "1"}
                             ),
                             html.Button(
                                 html.I(className="fas fa-download", style={"fontSize": "24px", "color": "white"}),
+                                n_clicks=0,
                                 id="download-button",
                                 style={
                                     "marginLeft": "10px",
@@ -199,6 +223,7 @@ app.layout = html.Div([
                                     "borderRadius": "5px",
                                     "cursor": "pointer",
                                     "fontSize": "20px"
+
                                 }
                             )
                         ]
@@ -210,10 +235,10 @@ app.layout = html.Div([
                                 id="metric_table",
                                 sort_action='native',
                                 columns=[
-                                    {"name": "Policy", "id": "policy"},
-                                    {"name": "PnL", "id": "PnL"},
-                                    {"name": "Per MWh", "id": "per MWh"},
-                                    {"name": "Win %", "id": "win %"}
+                                    {"name": "Model Name", "id": "policy"},
+                                    {"name": "Total Profit", "id": "PnL"},
+                                    {"name": "Profit per MWh", "id": "per MWh"},
+                                    {"name": "Win Percentage", "id": "win %"}
                                 ],
                                 style_table={"overflowX": "auto"},
                                 style_cell={"padding": "10px", "textAlign": "center", "border": "1px solid #ddd"},
@@ -247,8 +272,139 @@ app.layout = html.Div([
 
 
 @app.callback(
+    [Output("graph", "figure",allow_duplicate=True),
+    Output("metric_table", "data",allow_duplicate=True),
+    Output('toggle-area-container', 'style'),
+    Output('area-toggle','value')
+    ],
     [
-        Output("chart-container", "children",allow_duplicate=True),
+    Input('reset-chart-toggle-button','n_clicks'),
+    ],
+    prevent_initial_call=True
+)
+def toggle_area(n_clicks):
+    ctx = dash.callback_context
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    if button_id =='reset-chart-toggle-button':
+        # Fetch the data and summary from the board
+        global board
+        board = logic.Leaderboard() # Doing reset by initializing the class again
+        summary_data = board.summarize()
+        
+        # Generate the chart using the helper function
+        fig = create_figure(
+            board.exclusions_df,
+            x_col="date",
+            y_col=board.chart_type,
+            title="Leaderboard Data",
+            x_label="Date",
+            y_label="Profit Cumulative"
+        )
+        # Prepare the table data using the helper function
+        summary_table_data = prepare_table_data(summary_data)
+        return fig, summary_table_data, {'display': 'none'}, []
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+@app.callback(
+    [Output("graph", "figure",allow_duplicate=True),
+    Output("metric_table", "data",allow_duplicate=True),
+     Output('toggle-area-container', 'style',allow_duplicate=True),
+    ],
+    [Input('graph', 'relayoutData'),
+    ],
+     State("area-toggle", "value"),
+    prevent_initial_call=True
+)
+def pan_graph(relayoutData,area_toggle):
+    if relayoutData:
+        if ('xaxis.range[0]' in relayoutData or 'yaxis.range[0]' in relayoutData) and len(area_toggle)==0:
+
+                start_date = relayoutData['xaxis.range[0]']
+                end_date = relayoutData['xaxis.range[1]']
+                # Convert the date string to a datetime object
+                start_datetime_object = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S.%f")
+                end_datetime_object = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
+                start_date_date_only = start_datetime_object.date()
+                end_date_date_only = end_datetime_object.date()
+                board.pan(start_date_date_only,end_date_date_only)
+                # Prepare the table data using the helper function
+                summary_data = board.summarize()
+                summary_table_data = prepare_table_data(summary_data)
+                return dash.no_update, summary_table_data, {'display': 'block'}
+        elif ('xaxis.range[0]' in relayoutData or 'yaxis.range[0]' in relayoutData) and len(area_toggle)>0:
+                start_date = relayoutData['xaxis.range[0]']
+                end_date = relayoutData['xaxis.range[1]']
+                # Convert the date string to a datetime object
+                start_datetime_object = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S.%f")
+                end_datetime_object = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
+                start_date_date_only = start_datetime_object.date()
+                end_date_date_only = end_datetime_object.date()
+                board.pan(start_date_date_only,end_date_date_only)
+                # Generate the chart using the helper function
+                fig = create_figure(
+                    board.window,
+                    x_col="date",
+                    y_col=board.chart_type,
+                    title="Leaderboard Data",
+                    x_label="Date",
+                    y_label="Profit Cumulative"
+                )
+                # Prepare the table data using the helper function
+                summary_data = board.summarize()
+                summary_table_data = prepare_table_data(summary_data)
+                return fig, summary_table_data, {'display': 'block'}
+    return dash.no_update, dash.no_update, dash.no_update
+
+@app.callback(
+    [
+        Output("graph", "figure",allow_duplicate=True),
+        Output("metric_table", "data",allow_duplicate=True),
+    ],
+    [
+        Input("area-toggle", "value"),  # Input from the dropdown for chart type
+       
+    ],
+    prevent_initial_call=True
+)
+def togle_area_enabled(area_toggle):
+    if len(area_toggle)>0:
+        board.toggle()
+        summary_data = board.summarize()
+        fig = create_figure(
+            board.window,
+            x_col="date",
+            y_col=board.chart_type,
+            title="Leaderboard Data",
+            x_label="Date",
+            y_label="Profit Cumulative"
+        )
+
+        # Prepare the table data using the helper function
+        summary_table_data = prepare_table_data(summary_data)
+        return fig, summary_table_data
+    else:
+        board.toggle()
+        summary_data = board.summarize()
+        fig = create_figure(
+            board.exclusions_df,
+            x_col="date",
+            y_col=board.chart_type,
+            title="Leaderboard Data",
+            x_label="Date",
+            y_label="Profit Cumulative"
+        )
+        fig.update_layout(
+            xaxis=dict(
+                range=[board.window_start, board.window_end]  # Set the x-axis range
+            )
+        )
+        # Prepare the table data using the helper function
+        summary_table_data = prepare_table_data(summary_data)
+        return fig, summary_table_data
+
+@app.callback(
+    [
+        Output("graph", "figure",allow_duplicate=True),
         Output("metric_table", "data",allow_duplicate=True),
     ],
     [
@@ -260,7 +416,7 @@ def update_dropdown(chart_type):
     """
     Update the chart and table based on the current data in the leaderboard.
     """
-    
+    board.chart_type  = chart_type
     original_data = board.original
     summary_data = board.summarize()
 
@@ -268,7 +424,7 @@ def update_dropdown(chart_type):
     fig = create_figure(
         original_data,
         x_col="date",
-        y_col= chart_type,
+        y_col= board.chart_type,
         title="Leaderboard Data",
         x_label="Date",
         y_label="Profit Cumulative"
@@ -279,28 +435,29 @@ def update_dropdown(chart_type):
     summary_table_data = prepare_table_data(summary_data)
 
     # Return the updated chart and table data
-    return dcc.Graph(figure=fig), summary_table_data
+    return fig, summary_table_data
 
 @app.callback(
     [
-        Output("chart-container", "children"),
+        Output("graph", "figure"),
         Output("metric_table", "data"),
     ],
-    [Input("header_title", "children")]
+    [Input("header_title", "children"),
+    ]
 )
 def update_chart_and_table(header_title):
     """
     Update the chart and table based on the current data in the leaderboard.
     """
     # Fetch the data and summary from the board
-    original_data = board.original
+    exclusions_data = board.exclusions_df
     summary_data = board.summarize()
 
     # Generate the chart using the helper function
     fig = create_figure(
-        original_data,
+        exclusions_data,
         x_col="date",
-        y_col="profit_total",
+        y_col=board.chart_type,
         title="Leaderboard Data",
         x_label="Date",
         y_label="Profit Cumulative"
@@ -310,7 +467,7 @@ def update_chart_and_table(header_title):
     summary_table_data = prepare_table_data(summary_data)
 
     # Return the chart and the table data
-    return dcc.Graph(figure=fig), summary_table_data
+    return fig, summary_table_data
 
 # Callback to toggle visibility of the slider container
 @app.callback(
@@ -325,15 +482,13 @@ def toggle_slider_visibility(selected_values):
 # Callback
 @app.callback(
     [
-        Output("chart-container", "children", allow_duplicate=True), 
+         Output("graph", "figure", allow_duplicate=True),
         Output("metric_table", "data", allow_duplicate=True),
         Output("date-range-checklist", "value")
-        
     ],
     [
         Input("exclude-button", "n_clicks"),
         Input("reset-button", "n_clicks"),
-        Input("chart-type-dropdown", "value"),
     ],
     [
         State("date-picker-range", "start_date"),
@@ -341,71 +496,92 @@ def toggle_slider_visibility(selected_values):
     ],
     prevent_initial_call=True
 )
-def handle_buttons(exclude_clicks, reset_clicks, start_date, end_date,chart_type):
+def handle_buttons(exclude_clicks, reset_clicks, start_date, end_date):
     ctx = dash.callback_context
     if not ctx.triggered:
-        return dash.no_update, dash.no_update , dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
+    
     if button_id == "exclude-button":
         if start_date and end_date:
-            # Exclude region in the board
-            print(date.fromisoformat(start_date), date.fromisoformat(end_date))
+            # Create figure based on the original data
             board.exclude_region(date.fromisoformat(start_date), date.fromisoformat(end_date))
-            exclusions_data = board.exclusions_df
-            summary_data = board.summarize()
-            print(summary_data)
-            # Create chart and table
             fig = create_figure(
-                exclusions_data, x_col="date", y_col=chart_type,
-                title="Excluded Data", x_label="Date", y_label="Profit Cumulative"
+                board.exclusions_df,  # Use the original data (no modification)
+                x_col="date",
+                y_col=board.chart_type,
+                title="Leaderboard Data with Excluded Range",
+                x_label="Date",
+                y_label="Profit Cumulative",
             )
+            fig.add_shape(
+                    type="rect",
+                    x0=start_date,  # Ensure format matches x-axis
+                    x1=end_date,
+                    y0=0,
+                    y1=1,  # Full height of the plot (spanning the entire y-axis range)
+                    xref="x",
+                    yref="paper",  # Use paper ref for vertical span (not affected by data)
+                    fillcolor="rgba(128, 128, 128, 0.3)",  # Light gray
+                    layer="above",  # Ensure the exclusion area is above the lines, but not affecting the data itself
+                    line=dict(width=0)  # No border for the shaded area
+                )
+            
+
+            # Prepare table data from the summary
+            summary_data = board.summarize()
             summary_table_data = prepare_table_data(summary_data)
 
-            return dcc.Graph(figure=fig), summary_table_data , ["date_range_enable"]
+            return fig, summary_table_data, ["date_range_enable"]
 
         else:
-            return dcc.Graph(), [],[]  # Return empty if no valid range
+            return dash.no_update, dash.no_update, dash.no_update  # If no date range is selected, do nothing
 
     elif button_id == "reset-button":
-        # Reset the board
-        original_data = board.original
-        board.window = board.original
         board.exclusions_df = board.original
-        summary_data = board.summarize()
-
-        # Create chart and table
         fig = create_figure(
-            original_data, x_col="date", y_col=chart_type,
-            title="Leaderboard Data", x_label="Date", y_label="Profit Cumulative"
+            board.exclusions_df,  # Use original data (no exclusions)
+            x_col="date",
+            y_col=board.chart_type,
+            title="Leaderboard Data",
+            x_label="Date",
+            y_label="Profit Cumulative",
         )
+
+        summary_data = board.summarize()
         summary_table_data = prepare_table_data(summary_data)
 
-        return dcc.Graph(figure=fig), summary_table_data ,[]
+        return fig, summary_table_data, []
 
-    return None, [] , []
+    return dash.no_update, dash.no_update, dash.no_update
 
-# Callback to download data as CSV
 @app.callback(
     Output("download-dataframe-csv", "data"),
-    [Input("download-button", "n_clicks")],
-    [State("metric_table", "data")]
+    [Input("download-button", "n_clicks"),
+     Input("download-dropdown", "value")
+     ]
 )
-def download_csv(n_clicks, table_data):
-    if n_clicks:
-        # Convert the table data into a pandas DataFrame
-        df = pd.DataFrame(table_data)
+def download_excel(n_clicks, dropdown_value):
 
+    if n_clicks>0 and dropdown_value != None:
+        if dropdown_value == 'window_data':
+            table_data= board.window
+        elif dropdown_value == 'exclusion_data':
+            table_data = board.exclusions_df
+        elif dropdown_value == 'original_data':
+            table_data == board.original
         # Convert DataFrame to CSV
-        csv_string = df.to_csv(index=False, encoding='utf-8')
-
+        csv_string = table_data.write_csv()
         # Encode the CSV string as a downloadable base64 string
         b64 = base64.b64encode(csv_string.encode()).decode()
-
         # Return the download data
         return dict(content=b64, filename="trading_data.csv")
-    return dash.no_update
+    else:
+        return dash.no_update
+
+
+
 
 if __name__ == "__main__":
     app.run_server(debug=True, port=8050)

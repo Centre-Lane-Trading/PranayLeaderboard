@@ -14,7 +14,7 @@ class Leaderboard():
         self.grouping = True
         self.topn = None # group all nodes
         self.chart_type = "profit_total"
-        self.window_start = datetime(2024, 9, 16)
+        self.window_start = datetime(2022, 9, 16)
         self.window_end = datetime(2024, 10, 15)
 
     def get_date_range(self):
