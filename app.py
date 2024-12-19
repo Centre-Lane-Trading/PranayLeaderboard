@@ -584,5 +584,5 @@ def download_excel(n_clicks, dropdown_value):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=False, host= "0.0.0.0", port=8000)
 
